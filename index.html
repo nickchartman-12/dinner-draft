@@ -115,10 +115,11 @@ const saveDraft=()=>{try{localStorage.setItem("dd-draft",JSON.stringify(draft))}
 
 /* ---- shared state, rebuilt from the event log ---- */
 function state(){
-  const s={ballots:{},picks:{},reveal:false};
+  const s={ballots:{},picks:{},reveal:false,joined:{}};
   for(const e of events){
-    if(e.t==="reset"){s.ballots={};s.picks={};s.reveal=false;continue}
+    if(e.t==="reset"){s.ballots={};s.picks={};s.reveal=false;s.joined={};continue}
     const k=slug(e.name||"");
+    if((e.t==="join"||e.t==="ballot")&&k) s.joined[k]=e.name;
     if(e.t==="ballot"&&k) s.ballots[k]={name:e.name,chips:e.chips||{},veto:e.veto};
     else if(e.t==="unballot"&&k) delete s.ballots[k];
     else if(e.t==="pick"&&k&&["s1","s2","f"].includes(e.m)){(s.picks[k]=s.picks[k]||{})[e.m]=e.x}
@@ -159,12 +160,13 @@ function render(){
     main.innerHTML=`<div class="panel"><h2>Who's voting?</h2><div class="row"><input type="text" id="nm" maxlength="20" placeholder="Your first name" autocomplete="given-name"><button id="go">Join</button></div>
       <div class="status">${Object.values(S.ballots).map(b=>`<span class="pill done">${esc(b.name)} ✓</span>`).join("")}</div></div>`;
     $("#nm").value=typed; if(focused)$("#nm").focus();
-    const go=()=>{const v=$("#nm").value.trim();if(!slug(v))return;me=v;try{localStorage.setItem("dd-name",v)}catch(e){};render()};
+    const go=()=>{const v=$("#nm").value.trim();if(!slug(v))return;me=v;try{localStorage.setItem("dd-name",v)}catch(e){};announce();render()};
     $("#go").onclick=go;$("#nm").onkeydown=e=>{if(e.key==="Enter")go()};
     return;
   }
   const myKey=slug(me), mine=S.ballots[myKey], n=Object.keys(S.ballots).length, revealed=n>=PLAYERS||S.reveal;
-  let h=`<div class="status"><span class="pill">You: ${esc(me)}</span>${Object.values(S.ballots).map(b=>`<span class="pill done">${esc(b.name)} ✓</span>`).join("")}${Array.from({length:Math.max(0,PLAYERS-n)}).map(()=>`<span class="pill">waiting…</span>`).join("")}${connected?"":`<span class="pill">reconnecting…</span>`}</div>`;
+  const people=Object.entries(S.joined);
+  let h=`<div class="status">${people.map(([k,nm])=>`<span class="pill ${S.ballots[k]?"done":""}">${esc(nm)}${k===myKey?" (you)":""} ${S.ballots[k]?"✓ locked":"· voting"}</span>`).join("")}${Array.from({length:Math.max(0,PLAYERS-people.length)}).map(()=>`<span class="pill">waiting for someone…</span>`).join("")}${connected?"":`<span class="pill">reconnecting…</span>`}</div>`;
 
   if(!mine && !revealed){
     const d=draft, vals=Object.values(d.chips), plus=vals.filter(v=>v>0).reduce((a,b)=>a+b,0), minus=vals.filter(v=>v<0).reduce((a,b)=>a-b,0);
@@ -246,7 +248,9 @@ function live(){
     es.onerror=()=>{connected=false;render()};
   }catch(e){}
 }
-render(); poll(); live();
+let announced=false;
+function announce(){if(!me||announced)return;announced=true;if(!state().joined[slug(me)])fetch("https://ntfy.sh/"+TOPIC,{method:"POST",body:JSON.stringify({t:"join",name:me})}).catch(()=>{announced=false})}
+render(); poll().then(announce); live();
 setInterval(poll,20000);
 </script>
 </body>
