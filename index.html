@@ -145,6 +145,17 @@ details summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 .conn::after{content:"";position:absolute;left:100%;top:50%;width:calc(100% + 2px);border-top:2px solid var(--line)}
 .c1{grid-column:2;grid-row:3/5;margin:16px 0}.c2{grid-column:2;grid-row:9/11;margin:16px 0}.c3{grid-column:4;grid-row:4/10;margin:16px 0}
 .bstat{display:flex;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+
+/* rock paper scissors */
+.duel{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center}
+.dside{border:1.5px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:2px;min-width:0;text-align:center}
+.dside.me{border-color:var(--chip);box-shadow:inset 0 -4px 0 var(--chip)}
+.dside b{font-size:1.05rem;overflow-wrap:anywhere}
+.dside span{font-size:.8rem;color:var(--muted);overflow-wrap:anywhere}
+.dside .dst{font-family:var(--mono);font-size:.72rem;color:var(--sea)}
+.throws{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.throws button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 4px;background:var(--surface);color:var(--ink);border-color:var(--ink);text-transform:capitalize}
+.throws button span{font-size:2rem;line-height:1}
 @media (prefers-reduced-motion:reduce){.item,.tile{transition:none}}
 </style>
 </head>
@@ -177,7 +188,7 @@ try{me=localStorage.getItem("dd-name")||null}catch(e){}
 
 /* ---------- deterministic game state from the shared log ---------- */
 function game(){
-  const G={order:[],names:{},p:{},places:PLACES.map(()=>({alloc:{},vetoBy:null})),turn:0,moves:[],picks:{}};
+  const G={order:[],names:{},p:{},places:PLACES.map(()=>({alloc:{},vetoBy:null})),turn:0,moves:[],picks:{},rps:{},seed:""};
   const fresh=()=>({plus:PLUS,minus:MINUS,veto:VETO});
   const remaining=k=>{const q=G.p[k];return q.plus+q.minus+q.veto};
   const advance=()=>{for(let s=1;s<=SEATS;s++){const nx=(G.turn+s)%SEATS;if(remaining(G.order[nx])>0){G.turn=nx;return}}};
@@ -189,10 +200,11 @@ function game(){
       continue;
     }
     if(e.t==="move"&&k&&G.order.length===SEATS&&G.order[G.turn]===k){
-      if(legal(G,k,e.kind,e.i)){apply(G,k,e.kind,e.i);G.moves.push({k,kind:e.kind,i:e.i});advance()}
+      if(legal(G,k,e.kind,e.i)){apply(G,k,e.kind,e.i);G.moves.push({k,kind:e.kind,i:e.i});advance();if(G.moves.length===TOTAL)G.seed=String(e._id||"")}
       continue;
     }
     if(e.t==="pick"&&k&&G.names[k]&&["s1","s2","f"].includes(e.m)){(G.picks[k]=G.picks[k]||{})[e.m]=e.x}
+    if(e.t==="rps"&&k&&G.names[k]&&typeof e.key==="string"&&["rock","paper","scissors"].includes(e.th)){(G.rps[e.key]=G.rps[e.key]||[]).push({k,r:e.r,th:e.th})}
   }
   G.done=G.order.length===SEATS&&G.moves.length>=TOTAL;
   return G;
@@ -217,13 +229,90 @@ function apply(G,k,kind,i){
 }
 function standings(G){
   return PLACES.map((n,i)=>{const pl=G.places[i];let net=0,backers=0;Object.values(pl.alloc).forEach(a=>{net+=a.p-a.m;if(a.p)backers++});return{i,n,net,backers,vetoed:!!pl.vetoBy}})
-    .sort((a,b)=>(a.vetoed-b.vetoed)||(b.net-a.net)||(b.backers-a.backers)||(a.i-b.i));
+    .sort((a,b)=>(a.vetoed-b.vetoed)||(b.net-a.net)||(a.i-b.i));
+}
+const BEATS={rock:"scissors",paper:"rock",scissors:"paper"}, EMO={rock:"✊",paper:"✋",scissors:"✌️"};
+function hash(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+// Same seed on every phone, so everyone sees the same randomly chosen players
+function pickOne(G,arr,salt){return arr[hash(G.seed+"|"+salt)%arr.length]}
+// One RPS duel between place A and place B. poolA/poolB are the players who voted for each side.
+function rpsDuel(G,key,iA,iB,poolA,poolB){
+  if(iA>iB){const d=rpsDuel(G,key,iB,iA,poolB,poolA);return{...d,swap:true}}
+  const ka=pickOne(G,poolA.length?poolA:G.order,key+"a");
+  let restB=poolB.filter(k=>k!==ka);if(!restB.length)restB=G.order.filter(k=>k!==ka);
+  const kb=pickOne(G,restB,key+"b");
+  let round=1,cur={},history=[],winner=null;
+  for(const t of (G.rps[key]||[])){
+    if(winner) break;
+    if(t.r!==round||(t.k!==ka&&t.k!==kb)||cur[t.k]) continue;
+    cur[t.k]=t.th;
+    if(cur[ka]&&cur[kb]){
+      history.push({r:round,ta:cur[ka],tb:cur[kb]});
+      if(cur[ka]===cur[kb]){round++;cur={}} else winner=BEATS[cur[ka]]===cur[kb]?iA:iB;
+    }
+  }
+  return{key,iA,iB,ka,kb,round,cur,history,winner,pending:winner===null};
+}
+const backersOf=(G,i)=>G.order.filter(k=>((G.places[i].alloc[k]||{}).p||0)>0);
+// Final seeding: by net score; any tie that touches the top 4 is settled by RPS
+function finalOrder(G){
+  const base=standings(G).filter(x=>!x.vetoed), out=[], duels=[];let pending=null,j=0;
+  while(j<base.length){
+    const g=[base[j]];while(j+g.length<base.length&&base[j+g.length].net===base[j].net)g.push(base[j+g.length]);
+    if(g.length>1&&j<4&&!pending){
+      const sorted=[];
+      outer: for(const x of g){
+        let pos=sorted.length;
+        for(let q=0;q<sorted.length;q++){
+          const y=sorted[q], d=rpsDuel(G,"t"+Math.min(x.i,y.i)+"-"+Math.max(x.i,y.i),x.i,y.i,backersOf(G,x.i),backersOf(G,y.i));
+          d.net=x.net;duels.push(d);
+          if(d.pending){pending=d;break outer}
+          if(d.winner===x.i){pos=q;break}
+        }
+        sorted.splice(pos,0,x);
+      }
+      out.push(...(pending?g:sorted));
+    } else out.push(...g);
+    j+=g.length;
+  }
+  return{order:out,pending,duels:duels.filter(d=>!d.pending)};
 }
 function resolve(G,m,a,b){
-  let va=0,vb=0;const who={a:[],b:[]};
-  G.order.forEach(k=>{const p=(G.picks[k]||{})[m];if(p===a.i){va++;who.a.push(G.names[k])}else if(p===b.i){vb++;who.b.push(G.names[k])}});
-  const winner=va+vb>=SEATS?(va>vb?a:vb>va?b:(a.seed<b.seed?a:b)):null;
-  return{va,vb,who,winner};
+  let va=0,vb=0;const who={a:[],b:[]},keys={a:[],b:[]};
+  G.order.forEach(k=>{const p=(G.picks[k]||{})[m];if(p===a.i){va++;who.a.push(G.names[k]);keys.a.push(k)}else if(p===b.i){vb++;who.b.push(G.names[k]);keys.b.push(k)}});
+  let winner=null,duel=null;
+  if(va+vb>=SEATS){
+    if(va!==vb) winner=va>vb?a:b;
+    else{duel=rpsDuel(G,"m"+m,a.i,b.i,keys.a,keys.b);if(!duel.pending)winner=duel.winner===a.i?a:b}
+  }
+  return{va,vb,who,winner,duel};
+}
+function results(G){
+  const fo=finalOrder(G);
+  const R={fo,top:null,s1:null,s2:null,fin:null,duel:fo.pending,label:""};
+  if(fo.pending){const d=fo.pending;R.label=`${PLACES[d.iA]} and ${PLACES[d.iB]} tied at ${d.net>0?"+":""}${d.net}. Winner gets the higher seed.`;return R}
+  if(fo.order.length<4) return R;
+  const top=fo.order.slice(0,4).map((x,k)=>({...x,seed:k+1}));R.top=top;
+  R.s1=resolve(G,"s1",top[0],top[3]);R.s2=resolve(G,"s2",top[1],top[2]);
+  for(const [m,lab] of [["s1","Semi 1"],["s2","Semi 2"]]) if(R[m].duel&&R[m].duel.pending&&!R.duel){R.duel=R[m].duel;R.label=`${lab} tied ${R[m].va}–${R[m].vb}. Winner goes to the final.`}
+  if(R.s1.winner&&R.s2.winner){R.fin=resolve(G,"f",R.s1.winner,R.s2.winner);if(R.fin.duel&&R.fin.duel.pending&&!R.duel){R.duel=R.fin.duel;R.label=`The final tied ${R.fin.va}–${R.fin.vb}. Winner is where we eat.`}}
+  return R;
+}
+function rpsPanel(G,d,label,myKey){
+  const nm=k=>esc(G.names[k]), mine=myKey===d.ka||myKey===d.kb, thrown=mine&&d.cur[myKey];
+  const side=(k,i)=>`<div class="dside ${myKey===k?"me":""}"><b>${nm(k)}${myKey===k?" (you)":""}</b><span>for ${esc(PLACES[i])}</span><span class="dst">${d.cur[k]?"✓ locked in":"thinking…"}</span></div>`;
+  return `<div class="panel rps"><h2>Tiebreak: rock, paper, scissors</h2><p class="note">${esc(label)} Two voters were picked at random, one from each side.</p>
+    <div class="duel">${side(d.ka,d.iA)}<div class="vs">VS</div>${side(d.kb,d.iB)}</div>
+    <p class="mlabel" style="margin:0">Round ${d.round}${d.history.length?" · tied so far":""}</p>
+    ${mine?(thrown?`<p class="note">You threw ${EMO[d.cur[myKey]]} ${d.cur[myKey]}. Waiting for ${nm(myKey===d.ka?d.kb:d.ka)}.</p>`
+      :`<div class="throws">${["rock","paper","scissors"].map(t=>`<button data-rps="${t}" data-key="${d.key}" data-r="${d.round}" ${sending?"disabled":""}><span>${EMO[t]}</span>${t}</button>`).join("")}</div><p class="note">Your throw stays hidden until both of you lock in.</p>`)
+      :`<p class="note">Waiting for ${[d.ka,d.kb].filter(k=>!d.cur[k]).map(nm).join(" and ")} to throw.</p>`}
+    ${d.history.length?`<div class="feed">${d.history.map(x=>`<div><span class="n">R${x.r}</span><span>${nm(d.ka)} ${EMO[x.ta]} vs ${EMO[x.tb]} ${nm(d.kb)} · tie, go again</span></div>`).join("")}</div>`:""}
+  </div>`;
+}
+function duelLine(G,d){
+  const last=d.history[d.history.length-1], wA=d.winner===d.iA;
+  return `<div><span class="n">RPS</span><span><b>${esc(PLACES[d.winner])}</b> beat ${esc(PLACES[wA?d.iB:d.iA])}: ${esc(G.names[wA?d.ka:d.kb])} ${EMO[wA?last.ta:last.tb]} beat ${esc(G.names[wA?d.kb:d.ka])} ${EMO[wA?last.tb:last.ta]}${d.history.length>1?` after ${d.history.length-1} tie${d.history.length>2?"s":""}`:""}</span></div>`;
 }
 
 async function send(msg){
@@ -241,6 +330,7 @@ function render(){
     lastMoveCount=G.moves.length;
   }
   const upKey=G.order.length===SEATS&&!G.done?G.order[G.turn]:null, myTurn=upKey&&upKey===myKey;
+  const RS=G.done?results(G):null;
   document.title=myTurn?"● Your turn · Dinner Draft":"Dinner Draft";
   if(!myTurn) staged=null;
   let h="";
@@ -250,7 +340,7 @@ function render(){
     if(upKey) h+=`<div class="turn"><span class="big">${esc(G.names[upKey])} is up · ${phaseInfo(G.moves.length).label}</span><span class="sub">Move ${G.moves.length+1} of ${TOTAL}</span></div>`;
     const prev=$("#nm"),typed=prev?prev.value:"",focused=document.activeElement===prev;
     h+=`<div class="panel"><h2>${G.order.length<SEATS?"Grab a seat":"Table's full"}</h2>
-      ${G.order.length<SEATS?`<div class="row"><input type="text" id="nm" maxlength="20" placeholder="Your first name" autocomplete="given-name"><button id="go">Join</button></div><p class="note">Turn order is the order people join.</p>`:`<p class="note">All 4 seats are taken. You can watch.</p><div class="row"><input type="text" id="nm" maxlength="20" placeholder="Already joined? Enter your name"><button id="go">I'm in</button></div>`}</div>`;
+      ${G.order.length<SEATS?`<div class="row"><input type="text" id="nm" maxlength="20" placeholder="Your first name" autocomplete="given-name"><button id="go">Join</button></div><p class="note">Turn order is the order people join.</p>`:`<p class="note">All ${SEATS} seats are taken. You can watch.</p><div class="row"><input type="text" id="nm" maxlength="20" placeholder="Already joined? Enter your name"><button id="go">I'm in</button></div>`}</div>`;
     main.innerHTML=h+board(G,null,false);bind(G);
     const n=$("#nm");if(n){n.value=typed;if(focused)n.focus()}
     return;
@@ -259,6 +349,9 @@ function render(){
   // turn bar
   if(G.order.length<SEATS){
     h+=`<div class="turn"><span class="big">Waiting for players</span><span class="sub">${G.order.length}/${SEATS} seated · starts automatically</span></div>`;
+  } else if(G.done&&RS&&RS.duel){
+    const d=RS.duel, mine=(myKey===d.ka||myKey===d.kb)&&!d.cur[myKey];
+    h+=`<div class="turn ${mine?"mine":""}"><span class="big">${mine?"Your throw":"Tiebreak"}: ${esc(G.names[d.ka])} vs ${esc(G.names[d.kb])}</span><span class="sub">Rock, paper, scissors · ${esc(PLACES[d.iA])} vs ${esc(PLACES[d.iB])}</span></div>`;
   } else if(G.done){
     h+=`<div class="turn"><span class="big">Draft's done</span><span class="sub">All ${TOTAL} moves in · vote the bracket below</span></div>`;
   } else if(myTurn){
@@ -277,15 +370,14 @@ function render(){
     const q=G.p[k];return `<div class="seat ${k===upKey?"up":""}"><span class="who">${s+1}. ${esc(G.names[k])}${k===myKey?" (you)":""}</span><span class="left"><span class="lp">+${q.plus}</span><span class="lm">−${q.minus}</span><span>${q.veto?"veto ready":"veto used"}</span></span></div>`}).join("")}</div>`;
 
   // results + bracket when done
-  if(G.done){
-    const t=standings(G), top=t.filter(x=>!x.vetoed).slice(0,4).map((x,k)=>({...x,seed:k+1}));
+  if(G.done&&RS.duel) h+=rpsPanel(G,RS.duel,RS.label,myKey);
+  if(G.done&&!RS.fo.pending){
+    const top=RS.top||[], s1=RS.s1, s2=RS.s2, fin=RS.fin;
     if(top.length===4){
       const mp=(myKey&&G.picks[myKey])||{};
-      const s1=resolve(G,"s1",top[0],top[3]), s2=resolve(G,"s2",top[1],top[2]);
-      const fin=s1.winner&&s2.winner?resolve(G,"f",s1.winner,s2.winner):null;
-      if(fin&&fin.winner) h+=`<div class="winner"><span class="eyebrow">Tonight we eat at</span><b>${esc(fin.winner.n)}</b><span style="opacity:.75">Won the final ${Math.max(fin.va,fin.vb)}–${Math.min(fin.va,fin.vb)}${fin.va===fin.vb?" on the seed tiebreak":""}</span>${YELP[fin.winner.n]?`<a class="yl" style="color:inherit" href="https://www.yelp.com/biz/${YELP[fin.winner.n]}" target="_blank" rel="noopener">Open on Yelp</a>`:""}</div>`;
+      if(fin&&fin.winner) h+=`<div class="winner"><span class="eyebrow">Tonight we eat at</span><b>${esc(fin.winner.n)}</b><span style="opacity:.75">Won the final ${Math.max(fin.va,fin.vb)}–${Math.min(fin.va,fin.vb)}${fin.va===fin.vb?" after rock, paper, scissors":""}</span>${YELP[fin.winner.n]?`<a class="yl" style="color:inherit" href="https://www.yelp.com/biz/${YELP[fin.winner.n]}" target="_blank" rel="noopener">Open on Yelp</a>`:""}</div>`;
       const tagOf=n=>n.slice(0,2);
-      const canPick=(m,r)=>seated&&!r.winner&&!sending;
+      const canPick=(m,r)=>seated&&!r.winner&&!(r.duel&&r.va+r.vb>=SEATS)&&!sending;
       const slot=(m,x,r,cnt,who,cls)=>{
         if(!x) return `<div class="bslot tbd ${cls}"><span class="bn">${m==="f"?"TBD":""}</span></div>`;
         const st=r&&r.winner?(r.winner.i===x.i?"won":"lost"):"", mine=mp[m]===x.i?"mine":"", can=r&&canPick(m,r);
@@ -307,11 +399,15 @@ function render(){
           <div class="bslot champ ${champ?"won":"tbd"}"><span class="bn">${champ?"🏆 "+esc(champ.n):"🏆 ?"}</span></div>
         </div>
         <div class="bstat">${status("Semi 1",s1)}${status("Semi 2",s2)}${status("Final",fin)}</div>
-        <p class="note">5 voters, so every matchup has a winner. Letters show who picked what.</p></div>`;
+        <p class="note">Letters show who picked what. A tied matchup goes to rock, paper, scissors.</p></div>`;
     }
   }
 
-  if(G.done) h+=board(G,myKey,myTurn);
+  if(G.done){
+    const allDuels=[...RS.fo.duels,...[RS.s1,RS.s2,RS.fin].filter(r=>r&&r.duel&&!r.duel.pending).map(r=>r.duel)];
+    if(allDuels.length) h+=`<div class="panel"><h2>Tiebreak results</h2><div class="feed">${allDuels.map(d=>duelLine(G,d)).join("")}</div></div>`;
+    h+=board(G,myKey,myTurn,RS.fo.pending?null:RS.fo.order);
+  }
 
   // feed
   if(G.moves.length){
@@ -322,9 +418,10 @@ function render(){
   main.innerHTML=h; bind(G);
 }
 
-function board(G,myKey,myTurn){
+function board(G,myKey,myTurn,order){
   const done=G.done, ph=myTurn?phase(G.moves.length):null;
-  const rows=done?standings(G).map(x=>x.i):PLACES.map((_,i)=>i);
+  const st=done?standings(G):null;
+  const rows=done?(order?[...order.map(x=>x.i),...st.filter(x=>x.vetoed).map(x=>x.i)]:st.map(x=>x.i)):PLACES.map((_,i)=>i);
   // short tags per player: first letters, widened until unique
   const tag={};let len=1;while(len<6){G.order.forEach(k=>tag[k]=G.names[k].slice(0,len));if(new Set(Object.values(tag)).size===G.order.length)break;len++}
   return `<div class="panel tightpanel"><div class="row" style="justify-content:space-between"><h2>${done?"Final board":"The board"}</h2>${myTurn?`<span class="note">Tap a tile to ${ph==="veto"?"veto it":ph==="plus"?"add +1":"add −1"}</span>`:""}</div>
@@ -332,7 +429,7 @@ function board(G,myKey,myTurn){
     const pl=G.places[i];let net=0;const marks=[];
     G.order.forEach(k=>{const a=pl.alloc[k];if(!a)return;net+=a.p-a.m;if(a.p)marks.push(`<span class="mk p">${esc(tag[k])}+${a.p}</span>`);if(a.m)marks.push(`<span class="mk m">${esc(tag[k])}−${a.m}</span>`)});
     const can=myTurn&&!pl.vetoBy&&legal(G,myKey,ph,i), sel=staged&&staged.i===i;
-    const rank=done&&!pl.vetoBy?`<span class="rk">#${r+1}</span>`:"";
+    const rank=done&&order&&!pl.vetoBy?`<span class="rk">#${r+1}</span>`:"";
     return `<div class="tile ${pl.vetoBy?"vetoed":""} ${flashIdx===i?"flash":""} ${myTurn?(can?"can":"cant"):""} ${sel?"sel":""}" ${can?`data-k="${ph}" data-i="${i}" role="button" tabindex="0" aria-label="${ph} ${esc(PLACES[i])}"`:""}>
       <div class="tt">${rank}<span class="tn">${esc(PLACES[i])}</span></div>
       <div class="ts ${net>0?"pos":net<0?"neg":""}">${pl.vetoBy?"✕":(net>0?"+":"")+net}</div>
@@ -351,6 +448,7 @@ function bind(G){
   document.querySelectorAll(".tile a").forEach(a=>a.addEventListener("click",e=>e.stopPropagation()));
   on("cancel",()=>{staged=null;render()});
   on("play",()=>{if(staged)send({t:"move",name:me,kind:staged.kind,i:staged.i})});
+  document.querySelectorAll("[data-rps]").forEach(b=>b.onclick=()=>send({t:"rps",name:me,key:b.dataset.key,r:+b.dataset.r,th:b.dataset.rps}));
   document.querySelectorAll("[data-m]").forEach(b=>{const go=()=>send({t:"pick",name:me,m:b.dataset.m,x:+b.dataset.x});b.onclick=go;b.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go()}}});
   on("swap",()=>{me=null;try{localStorage.removeItem("dd-name")}catch(e){};render()});
   on("reset",()=>{const r=$("#reset");if(!armed){armed=true;r.textContent="Tap again to wipe the whole game";return}armed=false;send({t:"reset"})});
@@ -359,7 +457,7 @@ function bind(G){
 /* ---------- live sync ---------- */
 // Firebase push ids sort in creation order, so every phone replays events identically
 const byId={};
-function rebuild(){events=Object.keys(byId).sort().map(id=>byId[id])}
+function rebuild(){events=Object.keys(byId).sort().map(id=>({...byId[id],_id:id}))}
 function setAll(obj){for(const k in byId)delete byId[k];if(obj&&typeof obj==="object")for(const k in obj)if(obj[k]&&typeof obj[k]==="object")byId[k]=obj[k];rebuild()}
 async function poll(){
   try{const r=await fetch(EV()+".json");if(!r.ok)throw 0;setAll(await r.json());connected=true}catch(e){connected=false}
