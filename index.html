@@ -98,21 +98,67 @@ a.yl{color:inherit;text-decoration:underline;text-decoration-color:var(--line);t
 .winner b{font-family:var(--display);font-weight:400;font-size:clamp(2rem,9vw,3rem);line-height:1}
 details summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 .conn{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
-@media (prefers-reduced-motion:reduce){.item{transition:none}}
+
+/* tile board */
+.tightpanel{padding:12px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+@media (min-width:520px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.tile{position:relative;display:flex;flex-direction:column;gap:4px;min-width:0;min-height:96px;padding:8px 8px 22px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);transition:background .4s,transform .15s}
+.tile .tt{display:flex;gap:4px;align-items:baseline;min-width:0}
+.tile .tn{font-weight:700;font-size:.8rem;line-height:1.15;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.tile .rk{font-family:var(--mono);font-size:.7rem;color:var(--gold);font-weight:700}
+.tile .ts{font-family:var(--display);font-size:1.5rem;line-height:1;font-variant-numeric:tabular-nums}
+.tile .ts.pos{color:var(--chip)} .tile .ts.neg{color:var(--sea)}
+.tile .tm{display:flex;flex-wrap:wrap;gap:3px}
+.tile .mk{font-size:.62rem;padding:1px 5px}
+.tile .ty{position:absolute;left:8px;bottom:5px;font-family:var(--mono);font-size:.62rem;color:var(--muted);text-decoration:none}
+.tile.flash{background:var(--gold-soft)}
+.tile.can{cursor:pointer;border-color:var(--ink)}
+.tile.can:active{transform:scale(.97)}
+.tile.cant{opacity:.45}
+.tile.sel{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold)}
+.tile.vetoed{filter:grayscale(1);opacity:.4;background:var(--bg)}
+.tile.vetoed .tn{text-decoration:line-through;text-decoration-thickness:2px}
+
+/* bracket */
+.bracket{display:grid;grid-template-columns:minmax(0,1fr) 14px minmax(0,1fr) 14px minmax(0,1fr);grid-template-rows:auto repeat(11,32px);margin-top:4px}
+.bh{grid-row:1;font-family:var(--mono);font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding-bottom:6px}
+.bslot{position:relative;z-index:1;margin:2px 0;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);padding:5px 6px;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto 1fr;column-gap:5px;align-content:start;min-width:0;overflow:hidden}
+.bslot .bs{font-family:var(--mono);font-size:.65rem;color:var(--muted);padding-top:1px}
+.bslot .bn{font-weight:700;font-size:.74rem;line-height:1.1;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.bslot .bv{grid-column:1/-1;display:flex;gap:3px;flex-wrap:wrap;align-items:center;align-self:end}
+.bslot .bv i{font-style:normal;font-family:var(--mono);font-size:.6rem;padding:0 4px;border-radius:999px;background:var(--sea);color:var(--surface)}
+.bslot .bv em{font-style:normal;font-family:var(--mono);font-size:.6rem;color:var(--muted)}
+.bslot.can{cursor:pointer;border-color:var(--ink)}
+.bslot.mine{border-color:var(--sea);box-shadow:0 0 0 2px var(--sea)}
+.bslot.mine .bv em{color:var(--sea);font-weight:700}
+.bslot.won{border-color:var(--gold);box-shadow:inset 3px 0 0 var(--gold)}
+.bslot.lost{opacity:.4}
+.bslot.tbd{border-style:dashed;color:var(--muted);background:transparent}
+.bslot.champ{grid-column:5;grid-row:6/9;align-self:center;min-height:60px;display:flex;align-items:center;justify-content:center;text-align:center}
+.bslot.champ.won{background:var(--ink);color:var(--bg);border-color:var(--gold);box-shadow:none}
+.bslot.champ .bn{font-size:.8rem}
+.r1{grid-column:1;grid-row:2/4}.r2{grid-column:1;grid-row:4/6}.r3{grid-column:1;grid-row:8/10}.r4{grid-column:1;grid-row:10/12}
+.f1{grid-column:3;grid-row:3/5}.f2{grid-column:3;grid-row:9/11}
+.conn{position:relative;border:2px solid var(--line);border-left:none;border-radius:0 8px 8px 0;width:50%}
+.conn::after{content:"";position:absolute;left:100%;top:50%;width:calc(100% + 2px);border-top:2px solid var(--line)}
+.c1{grid-column:2;grid-row:3/5;margin:16px 0}.c2{grid-column:2;grid-row:9/11;margin:16px 0}.c3{grid-column:4;grid-row:4/10;margin:16px 0}
+.bstat{display:flex;gap:12px;flex-wrap:wrap;font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.item,.tile{transition:none}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>Dinner <span>Draft</span></h1>
-    <p class="lede">Take turns, one move each: drop a + chip, a − chip, or your veto. Everyone sees every move live. When all chips are down, the top 4 go head to head.</p>
+    <p class="lede">Veto round, then 5 laps of +1, then 5 laps of −1. Everyone sees every move.</p>
   </header>
   <div id="main"><div class="panel"><p class="note">Connecting…</p></div></div>
 </div>
 
 <script>
 const TOPIC="dinnerdraft-173d3f9a6930";
-const SEATS=4, PLUS=10, MINUS=5, VETO=1, CAP=3;
+const SEATS=4, PLUS=5, MINUS=5, VETO=1, CAP=3;
 const PLACES=["Sticks and Stones","Surf Dogs","Folks Pizzeria","Sea Salt","Gen BBQ","Silk Thai","Red Table","Rack House","Houston's","Beachwood","Kung Pao Bowl","Cheesecake Factory","Captain Jack's","Bear Flag","Beach Burgers & Brews","Flecha","Roux","Bollini's Il Forno"];
 const YELP={"Sticks and Stones":"sticks-and-stones-huntington-beach","Surf Dogs":"surf-dogs-sports-grill-huntington-beach","Folks Pizzeria":"folks-pizzeria-costa-mesa-costa-mesa","Sea Salt":"sea-salt-japanese-eatery-huntington-beach-3","Gen BBQ":"gen-korean-bbq-house-westminster","Silk Thai":"silk-thai-cuisine-huntington-beach","Red Table":"red-table-huntington-beach","Rack House":"harbour-rackhouse-huntington-beach-3","Houston's":"houstons-restaurant-irvine-3","Beachwood":"beachwood-pizza-and-beer-huntington-beach","Kung Pao Bowl":"kung-pao-bowl-huntington-beach","Cheesecake Factory":"the-cheesecake-factory-huntington-beach-3","Captain Jack's":"captain-jacks-sunset-beach","Bear Flag":"bear-flag-fish-huntington-beach-2","Beach Burgers & Brews":"beach-burgers-and-brews-huntington-beach","Flecha":"flecha-cantina-huntington-beach","Roux":"roux-seafood-kitchen-huntington-beach","Bollini's Il Forno":"bollini-s-il-forno-huntington-beach-4"};
 const TOTAL=SEATS*(PLUS+MINUS+VETO);
@@ -151,7 +197,10 @@ function game(){
 // a reset wipes everything before it: replay only what follows the latest reset
 game.fromAfter=()=>{const i=events.map(e=>e.t).lastIndexOf("reset");const keep=events;events=keep.slice(i+1);const G=game();events=keep;return G};
 
+function phase(n){return n<SEATS*VETO?"veto":n<SEATS*(VETO+PLUS)?"plus":"minus"}
+function phaseInfo(n){const ph=phase(n);if(ph==="veto")return{ph,label:"Veto round",round:""};if(ph==="plus"){const r=Math.floor((n-SEATS*VETO)/SEATS)+1;return{ph,label:"+1 rounds",round:` · round ${r} of ${PLUS}`}}const r=Math.floor((n-SEATS*(VETO+PLUS))/SEATS)+1;return{ph,label:"−1 rounds",round:` · round ${r} of ${MINUS}`}}
 function legal(G,k,kind,i){
+  if(kind!==phase(G.moves.length)) return false;
   const q=G.p[k], pl=G.places[i]; if(!q||!pl||pl.vetoBy) return false;
   const a=pl.alloc[k]||{p:0,m:0};
   if(kind==="plus") return q.plus>0&&a.m===0&&a.p<CAP;
@@ -195,7 +244,7 @@ function render(){
 
   // join box (banner still shows whose turn it is)
   if(!me){
-    if(upKey) h+=`<div class="turn"><span class="big">${esc(G.names[upKey])} is up</span><span class="sub">Move ${G.moves.length+1} of ${TOTAL}</span></div>`;
+    if(upKey) h+=`<div class="turn"><span class="big">${esc(G.names[upKey])} is up · ${phaseInfo(G.moves.length).label}</span><span class="sub">Move ${G.moves.length+1} of ${TOTAL}</span></div>`;
     const prev=$("#nm"),typed=prev?prev.value:"",focused=document.activeElement===prev;
     h+=`<div class="panel"><h2>${G.order.length<SEATS?"Grab a seat":"Table's full"}</h2>
       ${G.order.length<SEATS?`<div class="row"><input type="text" id="nm" maxlength="20" placeholder="Your first name" autocomplete="given-name"><button id="go">Join</button></div><p class="note">Turn order is the order people join.</p>`:`<p class="note">All 4 seats are taken. You can watch.</p><div class="row"><input type="text" id="nm" maxlength="20" placeholder="Already joined? Enter your name"><button id="go">I'm in</button></div>`}</div>`;
@@ -210,15 +259,18 @@ function render(){
   } else if(G.done){
     h+=`<div class="turn"><span class="big">Draft's done</span><span class="sub">All ${TOTAL} moves in · vote the bracket below</span></div>`;
   } else if(myTurn){
-    const st=staged?`${kindLabel[staged.kind]} on ${esc(PLACES[staged.i])}`:"Tap +1, −1 or Veto on a place";
-    h+=`<div class="turn mine"><span class="big">Your turn</span><span class="sub">Move ${G.moves.length+1} of ${TOTAL}</span>
+    const PI=phaseInfo(G.moves.length), hint={veto:"Tap VETO on the place you won't eat at",plus:"Tap +1 on a place you want",minus:"Tap −1 on a place you don't want"}[PI.ph];
+    const st=staged?`${kindLabel[staged.kind]} on ${esc(PLACES[staged.i])}`:hint;
+    h+=`<div class="turn mine"><span class="big">Your turn · ${PI.label}</span><span class="sub">Move ${G.moves.length+1} of ${TOTAL}${PI.round}</span>
       <div class="stage"><b>${st}</b>${staged?`<button class="ghost" id="cancel">Cancel</button><button id="play" ${sending?"disabled":""}>${sending?"Sending…":"Play it"}</button>`:""}</div>${err?`<p class="err" style="color:inherit">${esc(err)}</p>`:""}</div>`;
   } else {
-    h+=`<div class="turn"><span class="big">${esc(G.names[upKey])} is up</span><span class="sub">Move ${G.moves.length+1} of ${TOTAL}${seated?"":" · you're watching"}</span></div>`;
+    const PI=phaseInfo(G.moves.length);
+    h+=`<div class="turn"><span class="big">${esc(G.names[upKey])} is up · ${PI.label}</span><span class="sub">Move ${G.moves.length+1} of ${TOTAL}${PI.round}${seated?"":" · you're watching"}</span></div>`;
   }
 
+  if(!G.done) h+=board(G,myKey,myTurn);
   // seats
-  h+=`<div class="seats">${Array.from({length:SEATS},(_,s)=>{const k=G.order[s];if(!k)return `<div class="seat empty"><span class="who">Seat ${s+1}</span><span class="left">open</span></div>`;
+  if(!G.done) h+=`<div class="seats">${Array.from({length:SEATS},(_,s)=>{const k=G.order[s];if(!k)return `<div class="seat empty"><span class="who">Seat ${s+1}</span><span class="left">open</span></div>`;
     const q=G.p[k];return `<div class="seat ${k===upKey?"up":""}"><span class="who">${s+1}. ${esc(G.names[k])}${k===myKey?" (you)":""}</span><span class="left"><span class="lp">+${q.plus}</span><span class="lm">−${q.minus}</span><span>${q.veto?"veto ready":"veto used"}</span></span></div>`}).join("")}</div>`;
 
   // results + bracket when done
@@ -229,17 +281,34 @@ function render(){
       const s1=resolve(G,"s1",top[0],top[3]), s2=resolve(G,"s2",top[1],top[2]);
       const fin=s1.winner&&s2.winner?resolve(G,"f",s1.winner,s2.winner):null;
       if(fin&&fin.winner) h+=`<div class="winner"><span class="eyebrow">Tonight we eat at</span><b>${esc(fin.winner.n)}</b><span style="opacity:.75">Won the final ${Math.max(fin.va,fin.vb)}–${Math.min(fin.va,fin.vb)}${fin.va===fin.vb?" on the seed tiebreak":""}</span>${YELP[fin.winner.n]?`<a class="yl" style="color:inherit" href="https://www.yelp.com/biz/${YELP[fin.winner.n]}" target="_blank" rel="noopener">Open on Yelp</a>`:""}</div>`;
-      const side=(m,x,r,cnt,who)=>`<div class="side ${r.winner?(r.winner.i===x.i?"won":"lost"):""}"><span class="seed">#${x.seed}</span><span class="nm">${yelp(x.n)}</span>
-        ${r.winner||!seated?`<span class="seed">${cnt}</span>`:`<button class="pick ${mp[m]===x.i?"on":""}" data-m="${m}" data-x="${x.i}" ${sending?"disabled":""}>${mp[m]===x.i?"Your pick":"Pick"}</button>`}
-        ${who.length?`<span class="who">${who.map(esc).join(", ")}</span>`:""}</div>`;
-      const match=(m,label,a,b,r)=>`<div class="match"><span class="mlabel">${label} · ${r.winner?"decided":`${r.va+r.vb}/${SEATS} voted`}</span>${side(m,a,r,r.va,r.who.a)}<div class="vs">VS</div>${side(m,b,r,r.vb,r.who.b)}</div>`;
-      h+=`<div class="panel"><h2>Final Four</h2><p class="note">Everyone picks a side. Picks show live. A 2–2 tie goes to the higher seed.</p>
-        ${match("s1","Semi 1",top[0],top[3],s1)}${match("s2","Semi 2",top[1],top[2],s2)}
-        ${fin?match("f","Final",s1.winner,s2.winner,fin):`<p class="note">The final opens once both semis have all 4 votes.</p>`}</div>`;
+      const tagOf=n=>n.slice(0,2);
+      const canPick=(m,r)=>seated&&!r.winner&&!sending;
+      const slot=(m,x,r,cnt,who,cls)=>{
+        if(!x) return `<div class="bslot tbd ${cls}"><span class="bn">${m==="f"?"TBD":""}</span></div>`;
+        const st=r&&r.winner?(r.winner.i===x.i?"won":"lost"):"", mine=mp[m]===x.i?"mine":"", can=r&&canPick(m,r);
+        return `<div class="bslot ${cls} ${st} ${mine} ${can?"can":""}" ${can?`data-m="${m}" data-x="${x.i}" role="button" tabindex="0"`:""}>
+          <span class="bs">${x.seed}</span><span class="bn">${esc(x.n)}</span>
+          <span class="bv">${who.map(w=>`<i>${esc(tagOf(w))}</i>`).join("")}${r&&!r.winner&&can?`<em>${mine?"your pick":"tap"}</em>`:""}</span></div>`;
+      };
+      const champ=fin&&fin.winner;
+      const fa=s1.winner?{...s1.winner}:null, fb=s2.winner?{...s2.winner}:null;
+      const status=(label,r)=>`<span>${label}: ${r?(r.winner?"decided":`${r.va+r.vb}/${SEATS} voted`):"waiting"}</span>`;
+      h+=`<div class="panel"><div class="row" style="justify-content:space-between"><h2>Final Four</h2><span class="note">Tap a team to pick it</span></div>
+        <div class="bracket">
+          <span class="bh" style="grid-column:1">Semis</span><span class="bh" style="grid-column:3">Final</span><span class="bh" style="grid-column:5">Champ</span>
+          ${slot("s1",top[0],s1,s1.va,s1.who.a,"r1")}${slot("s1",top[3],s1,s1.vb,s1.who.b,"r2")}
+          ${slot("s2",top[1],s2,s2.va,s2.who.a,"r3")}${slot("s2",top[2],s2,s2.vb,s2.who.b,"r4")}
+          <span class="conn c1"></span><span class="conn c2"></span>
+          ${slot("f",fa,fin,fin?fin.va:0,fin?fin.who.a:[],"f1")}${slot("f",fb,fin,fin?fin.vb:0,fin?fin.who.b:[],"f2")}
+          <span class="conn c3"></span>
+          <div class="bslot champ ${champ?"won":"tbd"}"><span class="bn">${champ?"🏆 "+esc(champ.n):"🏆 ?"}</span></div>
+        </div>
+        <div class="bstat">${status("Semi 1",s1)}${status("Semi 2",s2)}${status("Final",fin)}</div>
+        <p class="note">A 2–2 tie goes to the higher seed. Letters show who picked what.</p></div>`;
     }
   }
 
-  h+=board(G,myKey,myTurn);
+  if(G.done) h+=board(G,myKey,myTurn);
 
   // feed
   if(G.moves.length){
@@ -251,18 +320,23 @@ function render(){
 }
 
 function board(G,myKey,myTurn){
-  const done=G.done, rows=done?standings(G).map(x=>x.i):PLACES.map((_,i)=>i);
-  return `<div class="panel"><h2>${done?"Final board":"The board"}</h2><div class="list">${rows.map((i,r)=>{
+  const done=G.done, ph=myTurn?phase(G.moves.length):null;
+  const rows=done?standings(G).map(x=>x.i):PLACES.map((_,i)=>i);
+  // short tags per player: first letters, widened until unique
+  const tag={};let len=1;while(len<6){G.order.forEach(k=>tag[k]=G.names[k].slice(0,len));if(new Set(Object.values(tag)).size===G.order.length)break;len++}
+  return `<div class="panel tightpanel"><div class="row" style="justify-content:space-between"><h2>${done?"Final board":"The board"}</h2>${myTurn?`<span class="note">Tap a tile to ${ph==="veto"?"veto it":ph==="plus"?"add +1":"add −1"}</span>`:""}</div>
+  <div class="grid">${rows.map((i,r)=>{
     const pl=G.places[i];let net=0;const marks=[];
-    G.order.forEach(k=>{const a=pl.alloc[k];if(!a)return;net+=a.p-a.m;if(a.p)marks.push(`<span class="mk p">${esc(G.names[k])} +${a.p}</span>`);if(a.m)marks.push(`<span class="mk m">${esc(G.names[k])} −${a.m}</span>`)});
-    if(pl.vetoBy) marks.unshift(`<span class="mk v">VETO · ${esc(G.names[pl.vetoBy])}</span>`);
-    let ctrl="";
-    if(myTurn&&!pl.vetoBy){
-      const s=k=>staged&&staged.i===i&&staged.kind===k?"sel":"";
-      ctrl=`<div class="ctrl"><button class="bv ${s("veto")}" data-k="veto" data-i="${i}" ${legal(G,myKey,"veto",i)?"":"disabled"}>VETO</button><button class="bm ${s("minus")}" data-k="minus" data-i="${i}" ${legal(G,myKey,"minus",i)?"":"disabled"} aria-label="Minus one on ${esc(PLACES[i])}">−1</button><button class="bp ${s("plus")}" data-k="plus" data-i="${i}" ${legal(G,myKey,"plus",i)?"":"disabled"} aria-label="Plus one on ${esc(PLACES[i])}">+1</button></div>`;
-    }
-    return `<div class="item ${pl.vetoBy?"vetoed":""} ${flashIdx===i?"flash":""}"><span class="nm">${done&&!pl.vetoBy?`${r+1}. `:""}${yelp(PLACES[i])}</span><span class="net ${net>0?"pos":net<0?"neg":""}">${net>0?"+":""}${net}</span>
-      ${marks.length?`<div class="marks">${marks.join("")}</div>`:""}${ctrl}</div>`}).join("")}</div></div>`;
+    G.order.forEach(k=>{const a=pl.alloc[k];if(!a)return;net+=a.p-a.m;if(a.p)marks.push(`<span class="mk p">${esc(tag[k])}+${a.p}</span>`);if(a.m)marks.push(`<span class="mk m">${esc(tag[k])}−${a.m}</span>`)});
+    const can=myTurn&&!pl.vetoBy&&legal(G,myKey,ph,i), sel=staged&&staged.i===i;
+    const rank=done&&!pl.vetoBy?`<span class="rk">#${r+1}</span>`:"";
+    return `<div class="tile ${pl.vetoBy?"vetoed":""} ${flashIdx===i?"flash":""} ${myTurn?(can?"can":"cant"):""} ${sel?"sel":""}" ${can?`data-k="${ph}" data-i="${i}" role="button" tabindex="0" aria-label="${ph} ${esc(PLACES[i])}"`:""}>
+      <div class="tt">${rank}<span class="tn">${esc(PLACES[i])}</span></div>
+      <div class="ts ${net>0?"pos":net<0?"neg":""}">${pl.vetoBy?"✕":(net>0?"+":"")+net}</div>
+      <div class="tm">${pl.vetoBy?`<span class="mk v">VETO ${esc(tag[pl.vetoBy])}</span>`:marks.join("")}</div>
+      ${YELP[PLACES[i]]?`<a class="ty" href="https://www.yelp.com/biz/${YELP[PLACES[i]]}" target="_blank" rel="noopener" aria-label="${esc(PLACES[i])} on Yelp">yelp ↗</a>`:""}
+    </div>`}).join("")}</div>
+  ${G.order.length?`<p class="note">${G.order.map(k=>`<b>${esc(tag[k])}</b> = ${esc(G.names[k])}`).join(" · ")}</p>`:""}</div>`;
 }
 
 let armed=false;
@@ -270,10 +344,11 @@ function bind(G){
   const on=(id,f)=>{const e=$("#"+id);if(e)e.onclick=f};
   const go=()=>{const v=$("#nm").value.trim();if(!slug(v))return;me=v;try{localStorage.setItem("dd-name",v)}catch(e){};announced=false;announce();render()};
   on("go",go);const n=$("#nm");if(n)n.onkeydown=e=>{if(e.key==="Enter")go()};
-  document.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{staged={kind:b.dataset.k,i:+b.dataset.i};render()});
+  document.querySelectorAll("[data-k]").forEach(b=>{const pick=()=>{staged={kind:b.dataset.k,i:+b.dataset.i};render()};b.onclick=pick;b.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();pick()}}});
+  document.querySelectorAll(".tile a").forEach(a=>a.addEventListener("click",e=>e.stopPropagation()));
   on("cancel",()=>{staged=null;render()});
   on("play",()=>{if(staged)send({t:"move",name:me,kind:staged.kind,i:staged.i})});
-  document.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>send({t:"pick",name:me,m:b.dataset.m,x:+b.dataset.x}));
+  document.querySelectorAll("[data-m]").forEach(b=>{const go=()=>send({t:"pick",name:me,m:b.dataset.m,x:+b.dataset.x});b.onclick=go;b.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go()}}});
   on("swap",()=>{me=null;try{localStorage.removeItem("dd-name")}catch(e){};render()});
   on("reset",()=>{const r=$("#reset");if(!armed){armed=true;r.textContent="Tap again to wipe the whole game";return}armed=false;send({t:"reset"})});
 }
