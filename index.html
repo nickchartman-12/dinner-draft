@@ -157,7 +157,9 @@ details summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 </div>
 
 <script>
-const TOPIC="dinnerdraft-173d3f9a6930";
+const DB="https://dinner-draft-55b10-default-rtdb.firebaseio.com"; // Firebase Realtime Database URL
+const GAME="game1";
+const EV=()=>`${DB.replace(/\/$/,"")}/dinnerdraft/${GAME}/events`;
 const SEATS=4, PLUS=5, MINUS=5, VETO=1, CAP=3;
 const PLACES=["Sticks and Stones","Surf Dogs","Folks Pizzeria","Sea Salt","Gen BBQ","Silk Thai","Red Table","Rack House","Houston's","Beachwood","Kung Pao Bowl","Cheesecake Factory","Captain Jack's","Bear Flag","Beach Burgers & Brews","Flecha","Roux","Bollini's Il Forno"];
 const YELP={"Sticks and Stones":"sticks-and-stones-huntington-beach","Surf Dogs":"surf-dogs-sports-grill-huntington-beach","Folks Pizzeria":"folks-pizzeria-costa-mesa-costa-mesa","Sea Salt":"sea-salt-japanese-eatery-huntington-beach-3","Gen BBQ":"gen-korean-bbq-house-westminster","Silk Thai":"silk-thai-cuisine-huntington-beach","Red Table":"red-table-huntington-beach","Rack House":"harbour-rackhouse-huntington-beach-3","Houston's":"houstons-restaurant-irvine-3","Beachwood":"beachwood-pizza-and-beer-huntington-beach","Kung Pao Bowl":"kung-pao-bowl-huntington-beach","Cheesecake Factory":"the-cheesecake-factory-huntington-beach-3","Captain Jack's":"captain-jacks-sunset-beach","Bear Flag":"bear-flag-fish-huntington-beach-2","Beach Burgers & Brews":"beach-burgers-and-brews-huntington-beach","Flecha":"flecha-cantina-huntington-beach","Roux":"roux-seafood-kitchen-huntington-beach","Bollini's Il Forno":"bollini-s-il-forno-huntington-beach-4"};
@@ -225,7 +227,7 @@ function resolve(G,m,a,b){
 
 async function send(msg){
   sending=true;err="";render();
-  try{const r=await fetch("https://ntfy.sh/"+TOPIC,{method:"POST",body:JSON.stringify(msg)});if(!r.ok)throw 0;staged=null}
+  try{const r=await fetch(EV()+".json",{method:"POST",body:JSON.stringify(msg)});if(!r.ok)throw 0;staged=null}
   catch(e){err="Couldn't send. Check your connection and try again."}
   sending=false;render();
 }
@@ -354,27 +356,33 @@ function bind(G){
 }
 
 /* ---------- live sync ---------- */
-function ingest(raw){
-  try{const ev=JSON.parse(raw);if(ev.event!=="message"||seen.has(ev.id))return false;seen.add(ev.id);
-    const m=JSON.parse(ev.message);m._at=ev.time;m._id=ev.id;events.push(m);return true}catch(e){return false}
-}
-const order=()=>events.sort((a,b)=>(a._at-b._at)||(a._id<b._id?-1:a._id>b._id?1:0));
+// Firebase push ids sort in creation order, so every phone replays events identically
+const byId={};
+function rebuild(){events=Object.keys(byId).sort().map(id=>byId[id])}
+function setAll(obj){for(const k in byId)delete byId[k];if(obj&&typeof obj==="object")for(const k in obj)if(obj[k]&&typeof obj[k]==="object")byId[k]=obj[k];rebuild()}
 async function poll(){
-  try{const r=await fetch(`https://ntfy.sh/${TOPIC}/json?poll=1&since=all`);const txt=await r.text();let ch=false;
-    txt.split("\n").filter(Boolean).forEach(l=>{if(ingest(l))ch=true});if(ch)order();connected=true}catch(e){connected=false}
+  try{const r=await fetch(EV()+".json");if(!r.ok)throw 0;setAll(await r.json());connected=true}catch(e){connected=false}
   render();
 }
+let es=null;
 function live(){
-  try{const es=new EventSource(`https://ntfy.sh/${TOPIC}/sse?since=all`);
+  try{
+    if(es)es.close();
+    es=new EventSource(EV()+".json");
+    const handle=e=>{try{const {path,data}=JSON.parse(e.data);
+      if(path==="/"){setAll(data)}
+      else{const id=path.replace(/^\//,"").split("/")[0];if(data===null)delete byId[id];else if(path.split("/").length===2)byId[id]=data;else{return poll()}rebuild()}
+      connected=true;render()}catch(err){}};
+    es.addEventListener("put",handle);es.addEventListener("patch",e=>{poll()});
     es.onopen=()=>{connected=true;render()};
-    es.onmessage=e=>{if(ingest(e.data)){order();render()}};
-    es.onerror=()=>{connected=false;render()};}catch(e){}
+    es.onerror=()=>{connected=false;render()};
+  }catch(e){}
 }
 let announced=false;
 function announce(){
   if(!me||announced)return;announced=true;
   const G=game();if(G.names[slug(me)]||G.order.length>=SEATS)return;
-  fetch("https://ntfy.sh/"+TOPIC,{method:"POST",body:JSON.stringify({t:"join",name:me})}).catch(()=>{announced=false});
+  fetch(EV()+".json",{method:"POST",body:JSON.stringify({t:"join",name:me})}).catch(()=>{announced=false});
 }
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)poll()});
 render(); poll().then(announce); live();
