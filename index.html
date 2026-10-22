@@ -151,7 +151,7 @@ details summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 <div class="wrap">
   <header>
     <h1>Dinner <span>Draft</span></h1>
-    <p class="lede">Veto round, then 5 laps of +1, then 5 laps of −1. Everyone sees every move.</p>
+    <p class="lede">Veto round, then 5 laps of +1, then 2 laps of −1. Everyone sees every move.</p>
   </header>
   <div id="main"><div class="panel"><p class="note">Connecting…</p></div></div>
 </div>
@@ -160,7 +160,7 @@ details summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 const DB="https://dinner-draft-55b10-default-rtdb.firebaseio.com"; // Firebase Realtime Database URL
 const GAME="game1";
 const EV=()=>`${DB.replace(/\/$/,"")}/dinnerdraft/${GAME}/events`;
-const SEATS=4, PLUS=5, MINUS=5, VETO=1, CAP=3;
+const SEATS=4, PLUS=5, MINUS=2, VETO=1, CAP=3;
 const PLACES=["Sticks and Stones","Surf Dogs","Folks Pizzeria","Sea Salt","Gen BBQ","Silk Thai","Red Table","Rack House","Houston's","Beachwood","Kung Pao Bowl","Cheesecake Factory","Captain Jack's","Bear Flag","Beach Burgers & Brews","Flecha","Roux","Bollini's Il Forno"];
 const YELP={"Sticks and Stones":"sticks-and-stones-huntington-beach","Surf Dogs":"surf-dogs-sports-grill-huntington-beach","Folks Pizzeria":"folks-pizzeria-costa-mesa-costa-mesa","Sea Salt":"sea-salt-japanese-eatery-huntington-beach-3","Gen BBQ":"gen-korean-bbq-house-westminster","Silk Thai":"silk-thai-cuisine-huntington-beach","Red Table":"red-table-huntington-beach","Rack House":"harbour-rackhouse-huntington-beach-3","Houston's":"houstons-restaurant-irvine-3","Beachwood":"beachwood-pizza-and-beer-huntington-beach","Kung Pao Bowl":"kung-pao-bowl-huntington-beach","Cheesecake Factory":"the-cheesecake-factory-huntington-beach-3","Captain Jack's":"captain-jacks-sunset-beach","Bear Flag":"bear-flag-fish-huntington-beach-2","Beach Burgers & Brews":"beach-burgers-and-brews-huntington-beach","Flecha":"flecha-cantina-huntington-beach","Roux":"roux-seafood-kitchen-huntington-beach","Bollini's Il Forno":"bollini-s-il-forno-huntington-beach-4"};
 const TOTAL=SEATS*(PLUS+MINUS+VETO);
@@ -205,8 +205,8 @@ function legal(G,k,kind,i){
   if(kind!==phase(G.moves.length)) return false;
   const q=G.p[k], pl=G.places[i]; if(!q||!pl||pl.vetoBy) return false;
   const a=pl.alloc[k]||{p:0,m:0};
-  if(kind==="plus") return q.plus>0&&a.m===0&&a.p<CAP;
-  if(kind==="minus") return q.minus>0&&a.p===0&&a.m<CAP;
+  if(kind==="plus") return q.plus>0&&a.p<CAP;
+  if(kind==="minus") return q.minus>0&&a.m<CAP;
   if(kind==="veto") return q.veto>0;
   return false;
 }
