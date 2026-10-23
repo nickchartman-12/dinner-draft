@@ -213,8 +213,7 @@ function applyConfig(c){
 }
 const linkFor=i=>LINKS[i]||`https://www.yelp.com/search?find_desc=${encodeURIComponent(PLACES[i])}&find_loc=${encodeURIComponent(LOCS[i]||(CONFIG&&CONFIG.area)||"")}`;
 const linkLabel=i=>/yelp\.com\/biz\//.test(LINKS[i])?"yelp ↗":/yelp\.com/.test(linkFor(i))?"find on yelp ↗":"link ↗";
-// The Huntington Beach list, kept as a one-tap starting point
-const HB_PRESET=[["Sticks and Stones","sticks-and-stones-huntington-beach"],["Surf Dogs","surf-dogs-sports-grill-huntington-beach"],["Folks Pizzeria","folks-pizzeria-costa-mesa-costa-mesa"],["Sea Salt","sea-salt-japanese-eatery-huntington-beach-3"],["Gen BBQ","gen-korean-bbq-house-westminster"],["Silk Thai","silk-thai-cuisine-huntington-beach"],["Red Table","red-table-huntington-beach"],["Rack House","harbour-rackhouse-huntington-beach-3"],["Houston's","houstons-restaurant-irvine-3"],["Beachwood","beachwood-pizza-and-beer-huntington-beach"],["Kung Pao Bowl","kung-pao-bowl-huntington-beach"],["Cheesecake Factory","the-cheesecake-factory-huntington-beach-3"],["Captain Jack's","captain-jacks-sunset-beach"],["Bear Flag","bear-flag-fish-huntington-beach-2"],["Beach Burgers & Brews","beach-burgers-and-brews-huntington-beach"],["Flecha","flecha-cantina-huntington-beach"],["Roux","roux-seafood-kitchen-huntington-beach"],["Bollini's Il Forno","bollini-s-il-forno-huntington-beach-4"]].map(([name,y])=>({name,url:"https://www.yelp.com/biz/"+y,loc:"Huntington Beach, CA"}));
+
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -627,7 +626,7 @@ function renderSetup(){
     <div class="row"><input type="text" id="zip" inputmode="numeric" maxlength="5" placeholder="Zip code" value="${esc(SU.zip)}" style="flex:0 0 7.5em">
       <select id="radius" aria-label="Distance">${[2,5,10,15].map(m=>`<option value="${m}" ${SU.radius===m?"selected":""}>${m} mi</option>`).join("")}</select>
       <button id="near" ${SU.busy?"disabled":""}>${SU.busy==="near"?"Looking…":"Find nearby"}</button></div>
-    <div class="row"><input type="text" id="q" placeholder="Search by name, e.g. Mastro's" value="${esc(SU.q)}"><button class="ghost" id="search" ${SU.busy?"disabled":""}>${SU.busy==="search"?"Searching…":"Search"}</button></div>
+    <div class="row"><input type="text" id="q" placeholder="Search by name" value="${esc(SU.q)}"><button class="ghost" id="search" ${SU.busy?"disabled":""}>${SU.busy==="search"?"Searching…":"Search"}</button></div>
     ${SU.err?`<p class="err">${esc(SU.err)}</p>`:""}
     ${found.length?`<div class="row" style="justify-content:space-between"><span class="note">${esc(SU.foundLabel)}</span><button class="ghost small" id="addtop">Add top 10</button></div>
       <div class="flist">${found.map((f,i)=>{const added=has(f.name);return `<button class="frow ${added?"added":""}" data-add="${i}" ${added?"disabled":""}><span><b>${esc(f.name)}</b><small>${esc([f.cuisine,f.d.toFixed(1)+" mi"].filter(Boolean).join(" · "))}</small></span><em>${added?"added":"+ add"}</em></button>`}).join("")}</div>`:""}
@@ -635,7 +634,6 @@ function renderSetup(){
       <input type="text" id="mname" placeholder="Restaurant name" value="${esc(SU.mname)}">
       <input type="text" id="murl" placeholder="Yelp link (optional)" value="${esc(SU.murl)}">
       <button class="ghost" id="madd">Add</button></div></details>
-    <button class="ghost small" id="preset">Use the Huntington Beach list (18)</button>
     <p class="note">Nearby results come from OpenStreetMap, so a few new spots may be missing. Search or add those by hand.</p>
   </div>
   <div class="panel">
@@ -654,7 +652,6 @@ function renderSetup(){
   on("near",findNearby);on("search",searchName);
   on("addtop",()=>{SU.found.slice(0,10).forEach(f=>addPlace({name:f.name,loc:f.loc}));renderSetup()});
   on("madd",()=>{if(addPlace({name:SU.mname,url:SU.murl.trim(),loc:SU.area||SU.zip})){SU.mname="";SU.murl=""}else if(SU.mname.trim())SU.err="That one's already on the list.";saveSU();renderSetup()});
-  on("preset",()=>{HB_PRESET.forEach(addPlace);renderSetup()});
   on("clearall",()=>{const b=$("#clearall");if(b.dataset.armed){SU.places=[];saveSU();renderSetup()}else{b.dataset.armed=1;b.textContent="Tap again to clear"}});
   on("create",createGame);
 }
