@@ -156,6 +156,35 @@ details summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 .throws{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .throws button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 4px;background:var(--surface);color:var(--ink);border-color:var(--ink);text-transform:capitalize}
 .throws button span{font-size:2rem;line-height:1}
+
+/* setup */
+.step{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.slab{font-weight:700}
+.sctl{display:flex;align-items:center;gap:10px}
+.sctl b{font-family:var(--mono);min-width:2ch;text-align:center;font-size:1.1rem}
+.sctl button{width:40px;height:40px;padding:0;border-radius:50%;font-size:1.2rem}
+button.small,.btnlink.small{padding:6px 10px;font-size:.82rem}
+.btnlink{display:inline-flex;align-items:center;font-weight:700;border-radius:10px;border:1.5px solid var(--ink);padding:11px 16px;color:var(--ink);text-decoration:none}
+.plist{display:flex;flex-direction:column;gap:6px}
+.prow{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.pmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.pmain b{overflow-wrap:anywhere}
+.pmain input{font-size:.82rem;padding:6px 8px}
+.flist{display:flex;flex-direction:column;gap:4px;max-height:360px;overflow-y:auto}
+.frow{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;background:var(--surface);color:var(--ink);border:1px solid var(--line);font-weight:400;padding:8px 10px}
+.frow span{display:flex;flex-direction:column;min-width:0}
+.frow small{color:var(--muted);font-size:.78rem}
+.frow em{font-style:normal;font-family:var(--mono);font-size:.78rem;color:var(--sea);white-space:nowrap}
+.frow.added{opacity:.5}
+.hand{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+select{font:inherit;padding:10px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink)}
+.probs{display:flex;flex-direction:column;gap:4px}
+.invite input{font-family:var(--mono);font-size:.8rem}
+
+.slab small{display:block;font-weight:400;font-size:.8rem;color:var(--muted)}
+.seg{display:flex;border:1.5px solid var(--ink);border-radius:10px;overflow:hidden;flex:none}
+.seg button{border:none;border-radius:0;background:transparent;color:var(--ink);padding:8px 14px}
+.seg button.on{background:var(--ink);color:var(--bg)}
 @media (prefers-reduced-motion:reduce){.item,.tile{transition:none}}
 </style>
 </head>
@@ -170,21 +199,32 @@ details summary{cursor:pointer;color:var(--muted);font-size:.9rem}
 
 <script>
 const DB="https://dinner-draft-55b10-default-rtdb.firebaseio.com"; // Firebase Realtime Database URL
-const GAME="game1";
-const EV=()=>`${DB.replace(/\/$/,"")}/dinnerdraft/${GAME}/events`;
-const SEATS=5, PLUS=5, MINUS=2, VETO=1, CAP=1;
-const PLACES=["Sticks and Stones","Surf Dogs","Folks Pizzeria","Sea Salt","Gen BBQ","Silk Thai","Red Table","Rack House","Houston's","Beachwood","Kung Pao Bowl","Cheesecake Factory","Captain Jack's","Bear Flag","Beach Burgers & Brews","Flecha","Roux","Bollini's Il Forno"];
-const YELP={"Sticks and Stones":"sticks-and-stones-huntington-beach","Surf Dogs":"surf-dogs-sports-grill-huntington-beach","Folks Pizzeria":"folks-pizzeria-costa-mesa-costa-mesa","Sea Salt":"sea-salt-japanese-eatery-huntington-beach-3","Gen BBQ":"gen-korean-bbq-house-westminster","Silk Thai":"silk-thai-cuisine-huntington-beach","Red Table":"red-table-huntington-beach","Rack House":"harbour-rackhouse-huntington-beach-3","Houston's":"houstons-restaurant-irvine-3","Beachwood":"beachwood-pizza-and-beer-huntington-beach","Kung Pao Bowl":"kung-pao-bowl-huntington-beach","Cheesecake Factory":"the-cheesecake-factory-huntington-beach-3","Captain Jack's":"captain-jacks-sunset-beach","Bear Flag":"bear-flag-fish-huntington-beach-2","Beach Burgers & Brews":"beach-burgers-and-brews-huntington-beach","Flecha":"flecha-cantina-huntington-beach","Roux":"roux-seafood-kitchen-huntington-beach","Bollini's Il Forno":"bollini-s-il-forno-huntington-beach-4"};
-const TOTAL=SEATS*(PLUS+MINUS+VETO);
+const QS=new URLSearchParams(location.search);
+let GAME=(QS.get("g")||"").replace(/[^A-Za-z0-9_-]/g,"").slice(0,40);
+const ROOT=()=>`${DB.replace(/\/$/,"")}/dinnerdraft/${GAME}`;
+const EV=()=>ROOT()+"/events";
+// Set per game from its saved config
+let SEATS=5, PLUS=5, MINUS=2, VETO=1, CAP=1, TOTAL=0, PLACES=[], LINKS=[], LOCS=[], CONFIG=null;
+function applyConfig(c){
+  CONFIG=c;SEATS=c.players;PLUS=c.plus;MINUS=c.minus;VETO=c.veto===0?0:1;
+  PLACES=c.places.map(p=>p.name);LINKS=c.places.map(p=>p.url||"");LOCS=c.places.map(p=>p.loc||"");
+  TOTAL=SEATS*(PLUS+MINUS+VETO);
+  const l=$(".lede");if(l)l.textContent=`${SEATS} players · ${PLACES.length} spots. ${VETO?"Veto round, then ":"No vetoes. "}${PLUS} lap${PLUS===1?"":"s"} of +1${MINUS?`, then ${MINUS} lap${MINUS===1?"":"s"} of −1`:""}. Everyone sees every move.`;
+}
+const linkFor=i=>LINKS[i]||`https://www.yelp.com/search?find_desc=${encodeURIComponent(PLACES[i])}&find_loc=${encodeURIComponent(LOCS[i]||(CONFIG&&CONFIG.area)||"")}`;
+const linkLabel=i=>/yelp\.com\/biz\//.test(LINKS[i])?"yelp ↗":/yelp\.com/.test(linkFor(i))?"find on yelp ↗":"link ↗";
+// The Huntington Beach list, kept as a one-tap starting point
+const HB_PRESET=[["Sticks and Stones","sticks-and-stones-huntington-beach"],["Surf Dogs","surf-dogs-sports-grill-huntington-beach"],["Folks Pizzeria","folks-pizzeria-costa-mesa-costa-mesa"],["Sea Salt","sea-salt-japanese-eatery-huntington-beach-3"],["Gen BBQ","gen-korean-bbq-house-westminster"],["Silk Thai","silk-thai-cuisine-huntington-beach"],["Red Table","red-table-huntington-beach"],["Rack House","harbour-rackhouse-huntington-beach-3"],["Houston's","houstons-restaurant-irvine-3"],["Beachwood","beachwood-pizza-and-beer-huntington-beach"],["Kung Pao Bowl","kung-pao-bowl-huntington-beach"],["Cheesecake Factory","the-cheesecake-factory-huntington-beach-3"],["Captain Jack's","captain-jacks-sunset-beach"],["Bear Flag","bear-flag-fish-huntington-beach-2"],["Beach Burgers & Brews","beach-burgers-and-brews-huntington-beach"],["Flecha","flecha-cantina-huntington-beach"],["Roux","roux-seafood-kitchen-huntington-beach"],["Bollini's Il Forno","bollini-s-il-forno-huntington-beach-4"]].map(([name,y])=>({name,url:"https://www.yelp.com/biz/"+y,loc:"Huntington Beach, CA"}));
 
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const slug=s=>String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40);
-const yelp=n=>YELP[n]?`<a class="yl" href="https://www.yelp.com/biz/${YELP[n]}" target="_blank" rel="noopener">${esc(n)}</a>`:esc(n);
+
 const kindLabel={plus:"+1",minus:"−1",veto:"VETO"};
 
 let me=null, events=[], seen=new Set(), connected=false, err="", sending=false, staged=null, lastMoveCount=-1, flashIdx=null;
-try{me=localStorage.getItem("dd-name")||null}catch(e){}
+const NAMEKEY=()=>"dd-name-"+GAME;
+try{me=GAME?localStorage.getItem(NAMEKEY())||null:null}catch(e){}
 
 /* ---------- deterministic game state from the shared log ---------- */
 function game(){
@@ -341,11 +381,12 @@ function render(){
     const prev=$("#nm"),typed=prev?prev.value:"",focused=document.activeElement===prev;
     h+=`<div class="panel"><h2>${G.order.length<SEATS?"Grab a seat":"Table's full"}</h2>
       ${G.order.length<SEATS?`<div class="row"><input type="text" id="nm" maxlength="20" placeholder="Your first name" autocomplete="given-name"><button id="go">Join</button></div><p class="note">Turn order is the order people join.</p>`:`<p class="note">All ${SEATS} seats are taken. You can watch.</p><div class="row"><input type="text" id="nm" maxlength="20" placeholder="Already joined? Enter your name"><button id="go">I'm in</button></div>`}</div>`;
-    main.innerHTML=h+board(G,null,false);bind(G);
+    main.innerHTML=inviteBar()+h+board(G,null,false);bind(G);
     const n=$("#nm");if(n){n.value=typed;if(focused)n.focus()}
     return;
   }
 
+  if(G.order.length<SEATS) h+=inviteBar();
   // turn bar
   if(G.order.length<SEATS){
     h+=`<div class="turn"><span class="big">Waiting for players</span><span class="sub">${G.order.length}/${SEATS} seated · starts automatically</span></div>`;
@@ -367,7 +408,7 @@ function render(){
   if(!G.done) h+=board(G,myKey,myTurn);
   // seats
   if(!G.done) h+=`<div class="seats">${Array.from({length:SEATS},(_,s)=>{const k=G.order[s];if(!k)return `<div class="seat empty"><span class="who">Seat ${s+1}</span><span class="left">open</span></div>`;
-    const q=G.p[k];return `<div class="seat ${k===upKey?"up":""}"><span class="who">${s+1}. ${esc(G.names[k])}${k===myKey?" (you)":""}</span><span class="left"><span class="lp">+${q.plus}</span><span class="lm">−${q.minus}</span><span>${q.veto?"veto ready":"veto used"}</span></span></div>`}).join("")}</div>`;
+    const q=G.p[k];return `<div class="seat ${k===upKey?"up":""}"><span class="who">${s+1}. ${esc(G.names[k])}${k===myKey?" (you)":""}</span><span class="left"><span class="lp">+${q.plus}</span><span class="lm">−${q.minus}</span>${VETO?`<span>${q.veto?"veto ready":"veto used"}</span>`:""}</span></div>`}).join("")}</div>`;
 
   // results + bracket when done
   if(G.done&&RS.duel) h+=rpsPanel(G,RS.duel,RS.label,myKey);
@@ -375,7 +416,7 @@ function render(){
     const top=RS.top||[], s1=RS.s1, s2=RS.s2, fin=RS.fin;
     if(top.length===4){
       const mp=(myKey&&G.picks[myKey])||{};
-      if(fin&&fin.winner) h+=`<div class="winner"><span class="eyebrow">Tonight we eat at</span><b>${esc(fin.winner.n)}</b><span style="opacity:.75">Won the final ${Math.max(fin.va,fin.vb)}–${Math.min(fin.va,fin.vb)}${fin.va===fin.vb?" after rock, paper, scissors":""}</span>${YELP[fin.winner.n]?`<a class="yl" style="color:inherit" href="https://www.yelp.com/biz/${YELP[fin.winner.n]}" target="_blank" rel="noopener">Open on Yelp</a>`:""}</div>`;
+      if(fin&&fin.winner) h+=`<div class="winner"><span class="eyebrow">Tonight we eat at</span><b>${esc(fin.winner.n)}</b><span style="opacity:.75">Won the final ${Math.max(fin.va,fin.vb)}–${Math.min(fin.va,fin.vb)}${fin.va===fin.vb?" after rock, paper, scissors":""}</span><a class="yl" style="color:inherit" href="${esc(linkFor(fin.winner.i))}" target="_blank" rel="noopener">${/yelp\.com\/biz\//.test(LINKS[fin.winner.i])?"Open on Yelp":"Look it up"}</a></div>`;
       const tagOf=n=>n.slice(0,2);
       const canPick=(m,r)=>seated&&!r.winner&&!(r.duel&&r.va+r.vb>=SEATS)&&!sending;
       const slot=(m,x,r,cnt,who,cls)=>{
@@ -413,7 +454,7 @@ function render(){
   if(G.moves.length){
     h+=`<div class="panel"><h2>Play by play</h2><div class="feed">${G.moves.slice(-8).reverse().map((m,j)=>`<div><span class="n">${G.moves.length-j}</span><span><b>${esc(G.names[m.k])}</b> ${m.kind==="veto"?"vetoed":m.kind==="plus"?"put +1 on":"put −1 on"} ${esc(PLACES[m.i])}</span></div>`).join("")}</div></div>`;
   }
-  h+=`<details><summary>Settings</summary><div class="row" style="margin-top:10px"><button class="ghost" id="swap">I'm not ${esc(me)}</button><button class="ghost" id="reset">Wipe and restart</button></div></details>`;
+  h+=`<details><summary>Settings</summary><div class="row" style="margin-top:10px"><button class="ghost" id="swap">I'm not ${esc(me)}</button><button class="ghost" id="reset">Wipe and restart</button><a class="ghost btnlink" href="${location.pathname}">New game</a></div></details>`;
   h+=`<span class="conn">${connected?"● live":"○ reconnecting…"}</span>`;
   main.innerHTML=h; bind(G);
 }
@@ -434,7 +475,7 @@ function board(G,myKey,myTurn,order){
       <div class="tt">${rank}<span class="tn">${esc(PLACES[i])}</span></div>
       <div class="ts ${net>0?"pos":net<0?"neg":""}">${pl.vetoBy?"✕":(net>0?"+":"")+net}</div>
       <div class="tm">${pl.vetoBy?`<span class="mk v">VETO ${esc(tag[pl.vetoBy])}</span>`:marks.join("")}</div>
-      ${YELP[PLACES[i]]?`<a class="ty" href="https://www.yelp.com/biz/${YELP[PLACES[i]]}" target="_blank" rel="noopener" aria-label="${esc(PLACES[i])} on Yelp">yelp ↗</a>`:""}
+      <a class="ty" href="${esc(linkFor(i))}" target="_blank" rel="noopener" aria-label="${esc(PLACES[i])} link">${linkLabel(i)}</a>
     </div>`}).join("")}</div>
   ${G.order.length?`<p class="note">${G.order.map(k=>`<b>${esc(tag[k])}</b> = ${esc(G.names[k])}`).join(" · ")}</p>`:""}</div>`;
 }
@@ -442,15 +483,18 @@ function board(G,myKey,myTurn,order){
 let armed=false;
 function bind(G){
   const on=(id,f)=>{const e=$("#"+id);if(e)e.onclick=f};
-  const go=()=>{const v=$("#nm").value.trim();if(!slug(v))return;me=v;try{localStorage.setItem("dd-name",v)}catch(e){};announced=false;announce();render()};
+  const go=()=>{const v=$("#nm").value.trim();if(!slug(v))return;me=v;try{localStorage.setItem(NAMEKEY(),v)}catch(e){};announced=false;announce();render()};
   on("go",go);const n=$("#nm");if(n)n.onkeydown=e=>{if(e.key==="Enter")go()};
   document.querySelectorAll("[data-k]").forEach(b=>{const pick=()=>{staged={kind:b.dataset.k,i:+b.dataset.i};render()};b.onclick=pick;b.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();pick()}}});
   document.querySelectorAll(".tile a").forEach(a=>a.addEventListener("click",e=>e.stopPropagation()));
   on("cancel",()=>{staged=null;render()});
   on("play",()=>{if(staged)send({t:"move",name:me,kind:staged.kind,i:staged.i})});
+  on("copylink",()=>{const b=$("#copylink"),u=b.dataset.url,inp=$("#invurl");
+    const ok=()=>{b.textContent="Copied";setTimeout(()=>{if(b.isConnected)b.textContent="Copy link"},1500)};
+    try{navigator.clipboard.writeText(u).then(ok,()=>{inp.select();b.textContent="Selected, now copy"})}catch(e){inp.select()}});
   document.querySelectorAll("[data-rps]").forEach(b=>b.onclick=()=>send({t:"rps",name:me,key:b.dataset.key,r:+b.dataset.r,th:b.dataset.rps}));
   document.querySelectorAll("[data-m]").forEach(b=>{const go=()=>send({t:"pick",name:me,m:b.dataset.m,x:+b.dataset.x});b.onclick=go;b.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();go()}}});
-  on("swap",()=>{me=null;try{localStorage.removeItem("dd-name")}catch(e){};render()});
+  on("swap",()=>{me=null;try{localStorage.removeItem(NAMEKEY())}catch(e){};render()});
   on("reset",()=>{const r=$("#reset");if(!armed){armed=true;r.textContent="Tap again to wipe the whole game";return}armed=false;send({t:"reset"})});
 }
 
@@ -483,9 +527,153 @@ function announce(){
   const G=game();if(G.names[slug(me)]||G.order.length>=SEATS)return;
   fetch(EV()+".json",{method:"POST",body:JSON.stringify({t:"join",name:me})}).catch(()=>{announced=false});
 }
-document.addEventListener("visibilitychange",()=>{if(!document.hidden)poll()});
-render(); poll().then(announce); live();
-setInterval(poll,15000);
+function inviteBar(){
+  const url=location.origin+location.pathname+"?g="+GAME;
+  return `<div class="panel invite"><div class="row" style="justify-content:space-between"><b>Invite your group</b><button class="ghost small" id="copylink" data-url="${esc(url)}">Copy link</button></div><input type="text" id="invurl" readonly value="${esc(url)}" aria-label="Game link"></div>`;
+}
+
+/* ---------- setup: build a new game ---------- */
+let SU={players:5,plus:5,minus:2,veto:1,zip:"",radius:5,area:"",center:null,places:[],found:[],foundLabel:"",q:"",mname:"",murl:"",busy:"",err:"",creating:false};
+try{const d=JSON.parse(localStorage.getItem("dd-setup")||"null");if(d&&Array.isArray(d.places))SU={...SU,...d,found:[],busy:"",err:"",creating:false}}catch(e){}
+const saveSU=()=>{try{const {found,busy,err,creating,...keep}=SU;localStorage.setItem("dd-setup",JSON.stringify(keep))}catch(e){}};
+const has=n=>SU.places.some(p=>p.name.trim().toLowerCase()===n.trim().toLowerCase());
+function addPlace(p){if(!p.name.trim()||has(p.name))return false;SU.places.push({name:p.name.trim().slice(0,60),url:p.url||"",loc:p.loc||""});saveSU();return true}
+function problems(){
+  const n=SU.places.length,out=[];
+  const need=SU.veto?SU.players+4:4;
+  if(n<need) out.push(`Add at least ${need} restaurants${SU.veto?" (one veto per person still leaves 4 for the bracket)":" (the bracket needs 4)"}. You have ${n}.`);
+  else{
+    const left=n-(SU.veto?SU.players:0);
+    if(SU.plus>left) out.push(`With ${n} restaurants, at most ${left} can survive the vetoes, so +1 chips can't be more than ${left}.`);
+    if(SU.minus>left) out.push(`−1 chips can't be more than ${left}.`);
+  }
+  SU.places.forEach(p=>{if(p.url&&!/^https?:\/\//i.test(p.url))out.push(`The link for ${p.name} must start with https://`)});
+  return out;
+}
+function miles(a,b){const R=3958.8,r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dn=r(b.lon-a.lon);const h=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+async function geoZip(zip){
+  const r=await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(zip)}&country=us&format=json&limit=1&addressdetails=1`);
+  const j=await r.json();if(!j.length)throw new Error("zip");
+  const a=j[0].address||{};return{lat:+j[0].lat,lon:+j[0].lon,label:[a.city||a.town||a.village||a.suburb||"",a.state||""].filter(Boolean).join(", ")||zip};
+}
+async function overpass(center,radiusMi,nameQ){
+  const esc2=t=>t.replace(/[\\"]/g,"").replace(/[.*+?^${}()|[\]]/g,"\\\\$&");
+  const f=nameQ?`["name"~"${esc2(nameQ)}",i]`:`["name"]`, kinds=nameQ?"^(restaurant|fast_food|cafe|bar|pub)$":"^restaurant$";
+  const q=`[out:json][timeout:25];nwr["amenity"~"${kinds}"]${f}(around:${Math.round(radiusMi*1609)},${center.lat},${center.lon});out center tags 400;`;
+  const r=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(q)});
+  if(!r.ok)throw new Error("overpass "+r.status);
+  const seen=new Map();
+  for(const el of (await r.json()).elements||[]){
+    const t=el.tags||{},lat=el.lat??(el.center&&el.center.lat),lon=el.lon??(el.center&&el.center.lon);if(!t.name||lat==null)continue;
+    const d=miles(center,{lat,lon}),k=t.name.toLowerCase();
+    if(seen.has(k)&&seen.get(k).d<=d)continue;
+    seen.set(k,{name:t.name,cuisine:(t.cuisine||"").split(";")[0].replace(/_/g," "),d,loc:t["addr:city"]||SU.area||SU.zip});
+  }
+  return [...seen.values()].sort((a,b)=>a.d-b.d);
+}
+async function findNearby(){
+  const zip=SU.zip.trim();if(!/^\d{5}$/.test(zip)){SU.err="Enter a 5-digit zip code.";renderSetup();return}
+  SU.busy="near";SU.err="";renderSetup();
+  try{
+    if(!SU.center||SU.center.zip!==zip){const c=await geoZip(zip);SU.center={...c,zip};SU.area=c.label}
+    const res=await overpass(SU.center,SU.radius);
+    SU.found=res;SU.foundLabel=`${res.length} restaurants within ${SU.radius} mi of ${SU.area}`;
+    if(!res.length)SU.err="Nothing found there. Try a bigger radius.";
+  }catch(e){SU.err=e.message==="zip"?"Couldn't find that zip code.":"The map service didn't answer. Wait a few seconds and try again, or add places by hand."}
+  SU.busy="";saveSU();renderSetup();
+}
+async function searchName(){
+  const q=SU.q.trim();if(q.length<2)return;
+  SU.busy="search";SU.err="";renderSetup();
+  try{
+    if(SU.zip&&/^\d{5}$/.test(SU.zip)&&(!SU.center||SU.center.zip!==SU.zip)){const c=await geoZip(SU.zip);SU.center={...c,zip:SU.zip};SU.area=c.label}
+    if(!SU.center){SU.err="Enter your zip code first so the search knows where to look.";SU.busy="";renderSetup();return}
+    const res=await overpass(SU.center,25,q);
+    SU.found=res;SU.foundLabel=`${res.length} match${res.length===1?"":"es"} for “${q}” near ${SU.area}`;
+    if(!res.length)SU.err=`No match for “${q}”. Check the spelling or add it by hand below.`;
+  }catch(e){SU.err="The map service didn't answer. Wait a few seconds and try again, or add it by hand."}
+  SU.busy="";renderSetup();
+}
+async function createGame(){
+  if(problems().length||SU.creating)return;
+  SU.creating=true;renderSetup();
+  const id=Math.random().toString(36).slice(2,8)+Date.now().toString(36).slice(-3);
+  const cfg={players:SU.players,plus:SU.plus,minus:SU.minus,veto:SU.veto?1:0,area:SU.area||"",places:SU.places.map(p=>({name:p.name,url:p.url||"",loc:p.loc||""})),created:Date.now()};
+  try{
+    const r=await fetch(`${DB.replace(/\/$/,"")}/dinnerdraft/${id}/config.json`,{method:"PUT",body:JSON.stringify(cfg)});if(!r.ok)throw 0;
+    history.replaceState(null,"",location.pathname+"?g="+id);GAME=id;boot();
+  }catch(e){SU.creating=false;SU.err="Couldn't create the game. Check your connection and try again.";renderSetup()}
+}
+function stepper(id,label,val,min,max,note){
+  return `<div class="step"><span class="slab">${label}${note?`<small>${note}</small>`:""}</span><div class="sctl"><button class="ghost" data-step="${id}" data-d="-1" ${val<=min?"disabled":""} aria-label="Fewer ${label}">−</button><b>${val}</b><button class="ghost" data-step="${id}" data-d="1" ${val>=max?"disabled":""} aria-label="More ${label}">+</button></div></div>`;
+}
+function renderSetup(){
+  const P=problems(), moves=SU.players*(SU.veto+SU.plus+SU.minus);
+  const found=SU.found.slice(0,40);
+  $("#main").innerHTML=`
+  <div class="panel"><h2>New game</h2>
+    ${stepper("players","Players",SU.players,2,12)}
+    ${stepper("plus","+1 chips each",SU.plus,1,10)}
+    ${stepper("minus","−1 chips each",SU.minus,0,6)}
+    <div class="step"><span class="slab">Vetoes<small>Each person can kill one place before voting starts</small></span><div class="seg" role="group" aria-label="Vetoes"><button class="${SU.veto?"on":""}" data-veto-opt="1" aria-pressed="${!!SU.veto}">On</button><button class="${SU.veto?"":"on"}" data-veto-opt="0" aria-pressed="${!SU.veto}">Off</button></div></div>
+    <p class="note">${SU.veto?"1 veto, then ":""}${SU.plus} +1${SU.plus===1?"":"s"}${SU.minus?` and ${SU.minus} −1${SU.minus===1?"":"s"}`:""} each. ${moves} moves total, about ${Math.round(moves*0.4)}–${moves} minutes depending on your group.</p>
+  </div>
+  <div class="panel"><div class="row" style="justify-content:space-between"><h2>Restaurants · ${SU.places.length}</h2>${SU.places.length?`<button class="ghost small" id="clearall">Clear all</button>`:""}</div>
+    ${SU.places.length?`<div class="plist">${SU.places.map((p,i)=>`<div class="prow"><div class="pmain"><b>${esc(p.name)}</b><input type="text" data-url="${i}" value="${esc(p.url)}" placeholder="Yelp link (optional)" aria-label="Link for ${esc(p.name)}"></div><button class="ghost small" data-del="${i}" aria-label="Remove ${esc(p.name)}">✕</button></div>`).join("")}</div>
+      <p class="note">No link? The tile links to a Yelp search for the name instead.</p>`
+      :`<p class="note">Nothing yet. Find places near a zip code, search by name, or add them by hand.</p>`}
+  </div>
+  <div class="panel"><h2>Add restaurants</h2>
+    <div class="row"><input type="text" id="zip" inputmode="numeric" maxlength="5" placeholder="Zip code" value="${esc(SU.zip)}" style="flex:0 0 7.5em">
+      <select id="radius" aria-label="Distance">${[2,5,10,15].map(m=>`<option value="${m}" ${SU.radius===m?"selected":""}>${m} mi</option>`).join("")}</select>
+      <button id="near" ${SU.busy?"disabled":""}>${SU.busy==="near"?"Looking…":"Find nearby"}</button></div>
+    <div class="row"><input type="text" id="q" placeholder="Search by name, e.g. Mastro's" value="${esc(SU.q)}"><button class="ghost" id="search" ${SU.busy?"disabled":""}>${SU.busy==="search"?"Searching…":"Search"}</button></div>
+    ${SU.err?`<p class="err">${esc(SU.err)}</p>`:""}
+    ${found.length?`<div class="row" style="justify-content:space-between"><span class="note">${esc(SU.foundLabel)}</span><button class="ghost small" id="addtop">Add top 10</button></div>
+      <div class="flist">${found.map((f,i)=>{const added=has(f.name);return `<button class="frow ${added?"added":""}" data-add="${i}" ${added?"disabled":""}><span><b>${esc(f.name)}</b><small>${esc([f.cuisine,f.d.toFixed(1)+" mi"].filter(Boolean).join(" · "))}</small></span><em>${added?"added":"+ add"}</em></button>`}).join("")}</div>`:""}
+    <details ${SU.mname?"open":""}><summary>Add by hand</summary><div class="hand">
+      <input type="text" id="mname" placeholder="Restaurant name" value="${esc(SU.mname)}">
+      <input type="text" id="murl" placeholder="Yelp link (optional)" value="${esc(SU.murl)}">
+      <button class="ghost" id="madd">Add</button></div></details>
+    <button class="ghost small" id="preset">Use the Huntington Beach list (18)</button>
+    <p class="note">Nearby results come from OpenStreetMap, so a few new spots may be missing. Search or add those by hand.</p>
+  </div>
+  <div class="panel">
+    ${P.length?`<div class="probs">${P.map(x=>`<p class="err">${esc(x)}</p>`).join("")}</div>`:`<p class="note">Ready. You'll get a link to send your group.</p>`}
+    <button id="create" ${P.length||SU.creating?"disabled":""}>${SU.creating?"Creating…":"Create game"}</button>
+  </div>`;
+  const on=(id,f)=>{const e=$("#"+id);if(e)e.onclick=f};
+  document.querySelectorAll("[data-step]").forEach(b=>b.onclick=()=>{const k=b.dataset.step;SU[k]+= +b.dataset.d;saveSU();renderSetup()});
+  document.querySelectorAll("[data-veto-opt]").forEach(b=>b.onclick=()=>{SU.veto=+b.dataset.vetoOpt;saveSU();renderSetup()});
+  document.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{SU.places.splice(+b.dataset.del,1);saveSU();renderSetup()});
+  document.querySelectorAll("[data-url]").forEach(inp=>{inp.oninput=()=>{SU.places[+inp.dataset.url].url=inp.value.trim();saveSU()};inp.onchange=()=>renderSetup()});
+  document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{const f=SU.found[+b.dataset.add];addPlace({name:f.name,loc:f.loc});renderSetup()});
+  const bindIn=(id,key,enter)=>{const e=$("#"+id);if(!e)return;e.oninput=()=>{SU[key]=e.value;saveSU()};if(enter)e.onkeydown=ev=>{if(ev.key==="Enter")enter()}};
+  bindIn("zip","zip",findNearby);bindIn("q","q",searchName);bindIn("mname","mname");bindIn("murl","murl");
+  const rs=$("#radius");if(rs)rs.onchange=()=>{SU.radius=+rs.value;saveSU()};
+  on("near",findNearby);on("search",searchName);
+  on("addtop",()=>{SU.found.slice(0,10).forEach(f=>addPlace({name:f.name,loc:f.loc}));renderSetup()});
+  on("madd",()=>{if(addPlace({name:SU.mname,url:SU.murl.trim(),loc:SU.area||SU.zip})){SU.mname="";SU.murl=""}else if(SU.mname.trim())SU.err="That one's already on the list.";saveSU();renderSetup()});
+  on("preset",()=>{HB_PRESET.forEach(addPlace);renderSetup()});
+  on("clearall",()=>{const b=$("#clearall");if(b.dataset.armed){SU.places=[];saveSU();renderSetup()}else{b.dataset.armed=1;b.textContent="Tap again to clear"}});
+  on("create",createGame);
+}
+
+/* ---------- boot ---------- */
+let started=false;
+async function boot(){
+  if(!GAME){$(".lede").textContent="Set up a game: pick how many people, pick the restaurants, send the link.";renderSetup();return}
+  $("#main").innerHTML=`<div class="panel"><p class="note">Loading game…</p></div>`;
+  try{
+    const r=await fetch(ROOT()+"/config.json");const c=await r.json();
+    if(!c||!Array.isArray(c.places)){$("#main").innerHTML=`<div class="panel"><h2>Game not found</h2><p class="note">This link doesn't match a game. Check it, or start a new one.</p><a class="btnlink" href="${location.pathname}">New game</a></div>`;return}
+    applyConfig(c);
+  }catch(e){$("#main").innerHTML=`<div class="panel"><h2>Can't reach the game</h2><p class="note">Check your connection, then reload.</p></div>`;return}
+  try{me=localStorage.getItem(NAMEKEY())||null}catch(e){}
+  render();await poll();announce();
+  if(!started){started=true;live();setInterval(poll,15000);document.addEventListener("visibilitychange",()=>{if(!document.hidden)poll()})}
+}
+boot();
 </script>
 </body>
 </html>
